@@ -22,8 +22,8 @@ const systemPrompts: Record<Template, string> = {
   'customer-support': 'You are a helpful and friendly customer support agent. Be conversational and concise.',
   'personal-assistant': 'You are a helpful and friendly personal assistant. Be proactive and efficient.',
   'navigation-system': 'You are a helpful and friendly navigation assistant. Provide clear and accurate directions.',
-  'open-claw': `You are the control interface for the Open Claw Agent on VPS 168.231.78.113 (Ubuntu 24.04.3 LTS).
-You are logged in as "root". The OpenClaw project (v2026.2.2-3) is active.
+  'open-claw': `You are the control interface for OpenMax by Eburon AI on VPS 168.231.78.113 (Ubuntu 24.04.3 LTS).
+You are logged in as "root". The OpenMax project (v2026.2.2-3) is active.
 
 OPERATIONAL CONTEXT:
 1. OpenClaw Gateway: Runs on ws://127.0.0.1:18789.
@@ -33,7 +33,7 @@ OPERATIONAL CONTEXT:
 RULES:
 1. Use 'manage_openclaw' for service actions, doctor checks, and config repairs.
 2. Use 'openvpn_control' for managing VPN tunnels and status.
-3. Use 'repository_control' to pull updates, check logs, or switch branches of the OpenClaw source code.
+3. Use 'repository_control' to pull updates, check logs, or switch branches of the OpenMax source code.
 4. Use 'execute_ssh_command' for general Linux tasks.
 5. When the user asks about the Dashboard, remind them to use the SSH tunnel: 'ssh -N -L 18789:127.0.0.1:18789 root@168.231.78.113'.
 6. Always provide technical, terminal-like feedback.`,
@@ -76,6 +76,20 @@ export const useUI = create<{
 }));
 
 /**
+ * OpenClaw Specific Stats
+ */
+export interface OpenClawStats {
+  gatewayStatus: 'running' | 'stopped' | 'error';
+  gatewayPid: number | null;
+  skillsEligible: number;
+  skillsMissing: number;
+  pluginsLoaded: number;
+  pluginsDisabled: number;
+  vpnActive: boolean;
+  lastEvent: string;
+}
+
+/**
  * VPS Dashboard Stats
  */
 export interface VpsStats {
@@ -84,6 +98,7 @@ export interface VpsStats {
   disk: number;
   uptime: string;
   lastUpdated: Date;
+  openClaw?: OpenClawStats;
 }
 
 export const useDashboard = create<{

@@ -37,11 +37,11 @@ const welcomeContent: Record<Template, { title: string; description: string; pro
     ],
   },
   'open-claw': {
-    title: 'Open Claw Agent',
-    description: 'Control your robotic claw and VPS (168.231.78.113) with voice commands.',
+    title: 'OpenMax by Eburon AI',
+    description: 'Control your robotic system and VPS (168.231.78.113) with voice commands.',
     prompts: [
-      'Open the claw.',
-      'Move the arm to 50, 20, 10.',
+      'Show me system logs.',
+      'How is the server performing?',
       'Run "df -h" on my VPS.',
     ],
   },
@@ -57,7 +57,7 @@ const WelcomeScreen: React.FC = () => {
           <span className="welcome-icon">{template === 'open-claw' ? 'precision_manufacturing' : 'mic'}</span>
           <div className="title-selector">
             <select value={template} onChange={(e) => setTemplate(e.target.value as Template)} aria-label="Select a template">
-              <option value="open-claw">Open Claw Agent</option>
+              <option value="open-claw">OpenMax Agent</option>
               <option value="customer-support">Customer Support</option>
               <option value="personal-assistant">Personal Assistant</option>
               <option value="navigation-system">Navigation System</option>
@@ -65,6 +65,7 @@ const WelcomeScreen: React.FC = () => {
             <span className="icon">arrow_drop_down</span>
           </div>
         </div>
+        <h2>{title}</h2>
         <p>{description}</p>
         <div className="example-prompts">
           {prompts.map((prompt, index) => (

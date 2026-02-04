@@ -3,28 +3,10 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-/**
- * Copyright 2024 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import cn from 'classnames';
-
 import { memo, ReactNode, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
-import { useSettings, useTools, useLogStore } from '@/lib/state';
-
+import { useSettings, useTools, useLogStore, useUI } from '@/lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
 export type ControlTrayProps = {
@@ -37,11 +19,10 @@ function ControlTray({ children }: ControlTrayProps) {
   const connectButtonRef = useRef<HTMLButtonElement>(null);
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
+  const { toggleSidebar } = useUI();
 
   useEffect(() => {
-    // FIX: Cannot find name 'connectButton'. Did you mean 'connectButtonRef'?
     if (!connected && connectButtonRef.current) {
-      // FIX: Cannot find name 'connectButton'. Did you mean 'connectButtonRef'?
       connectButtonRef.current.focus();
     }
   }, [connected]);
@@ -93,7 +74,6 @@ function ControlTray({ children }: ControlTrayProps) {
       tools,
       conversation: turns.map(turn => ({
         ...turn,
-        // Convert Date object to ISO string for JSON serialization
         timestamp: turn.timestamp.toISOString(),
       })),
     };
@@ -104,7 +84,7 @@ function ControlTray({ children }: ControlTrayProps) {
     const a = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     a.href = url;
-    a.download = `live-api-logs-${timestamp}.json`;
+    a.download = `openclaw-session-${timestamp}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -117,55 +97,73 @@ function ControlTray({ children }: ControlTrayProps) {
       : 'Mute microphone'
     : 'Connect and start microphone';
 
-  const connectButtonTitle = connected ? 'Stop streaming' : 'Start streaming';
+  const connectButtonTitle = connected ? 'Stop session' : 'Start session';
 
   return (
     <section className="control-tray">
-      <nav className={cn('actions-nav')}>
-        <button
-          className={cn('action-button mic-button')}
-          onClick={handleMicClick}
-          title={micButtonTitle}
-        >
-          {!muted ? (
-            <span className="material-symbols-outlined filled">mic</span>
-          ) : (
-            <span className="material-symbols-outlined filled">mic_off</span>
-          )}
-        </button>
-        <button
-          className={cn('action-button')}
-          onClick={handleExportLogs}
-          aria-label="Export Logs"
-          title="Export session logs"
-        >
-          <span className="material-symbols-outlined">download</span>
-        </button>
-        <button
-          className={cn('action-button')}
-          onClick={useLogStore.getState().clearTurns}
-          aria-label="Reset Chat"
-          title="Reset session logs"
-        >
-          <span className="material-symbols-outlined">refresh</span>
-        </button>
-        {children}
-      </nav>
-
-      <div className={cn('connection-container', { connected })}>
-        <div className="connection-button-container">
+      <div className="tray-inner">
+        <div className="tray-left">
           <button
-            ref={connectButtonRef}
-            className={cn('action-button connect-toggle', { connected })}
-            onClick={connected ? disconnect : connect}
-            title={connectButtonTitle}
+            className={cn('action-button mic-button', { muted, connected })}
+            onClick={handleMicClick}
+            title={micButtonTitle}
           >
-            <span className="material-symbols-outlined filled">
-              {connected ? 'pause' : 'play_arrow'}
-            </span>
+            {!muted ? (
+              <span className="material-symbols-outlined filled">mic</span>
+            ) : (
+              <span className="material-symbols-outlined filled">mic_off</span>
+            )}
+          </button>
+          
+          <div className="divider"></div>
+
+          <button
+            className="action-button"
+            onClick={toggleSidebar}
+            title="Open Settings"
+          >
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+
+          <button
+            className="action-button"
+            onClick={handleExportLogs}
+            title="Export session logs"
+          >
+            <span className="material-symbols-outlined">download</span>
+          </button>
+
+          <button
+            className="action-button"
+            onClick={useLogStore.getState().clearTurns}
+            title="Reset Terminal"
+          >
+            <span className="material-symbols-outlined">refresh</span>
           </button>
         </div>
-        <span className="text-indicator">Streaming</span>
+
+        <div className="tray-center">
+           {connected && <div className="live-status-indicator">
+              <span className="pulse-dot"></span>
+              <span className="status-text">UPLINK ACTIVE</span>
+           </div>}
+        </div>
+
+        <div className="tray-right">
+          <div className={cn('connection-container', { connected })}>
+            <button
+              ref={connectButtonRef}
+              className={cn('connect-toggle', { connected })}
+              onClick={connected ? disconnect : connect}
+              title={connectButtonTitle}
+            >
+              <span className="material-symbols-outlined filled">
+                {connected ? 'stop_circle' : 'bolt'}
+              </span>
+              <span className="toggle-label">{connected ? 'DISCONNECT' : 'INITIALIZE'}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );

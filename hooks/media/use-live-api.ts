@@ -25,7 +25,7 @@ import { LiveConnectConfig, Modality, LiveServerToolCall } from '@google/genai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
-import { useLogStore, useSettings, useTools, useDashboard } from '@/lib/state';
+import { useLogStore, useSettings, useTools, useDashboard, OpenClawStats } from '@/lib/state';
 
 export type UseLiveApiResults = {
   client: GenAILiveClient;
@@ -151,32 +151,73 @@ export function useLiveApi({
             executionMessage = `💻 **TERMINAL**: root@168.231.78.113\n$ \`${fc.args.command}\`\n\n\`\`\`bash\n${output}\n\`\`\``;
           } else if (fc.name === 'get_system_stats') {
             isSilent = true;
+            // Enhanced stats derived from OpenClaw context
             const stats = {
-              cpu: Math.floor(Math.random() * 5) + 1, // Idle VPS
+              cpu: Math.floor(Math.random() * 5) + 1, 
               memory: 1, 
               disk: 2.1,
               uptime: "14d 1h 12m",
-              lastUpdated: new Date()
+              lastUpdated: new Date(),
+              openClaw: {
+                gatewayStatus: 'running' as const,
+                gatewayPid: 1589,
+                skillsEligible: 5,
+                skillsMissing: 45,
+                pluginsLoaded: 2,
+                pluginsDisabled: 29,
+                vpnActive: false,
+                lastEvent: "Gateway polling loop active (v2026.2.2-3)"
+              }
             };
             useDashboard.getState().setStats(stats);
             simulatedOutput = JSON.stringify(stats);
           } else if (fc.name === 'manage_openclaw') {
             const { action } = fc.args;
             let detail = "";
-            if (action === 'start') detail = "Gateway started on pid 1589.";
-            else if (action === 'stop') detail = "Gateway service stopped.";
-            else if (action === 'doctor') detail = `┌  OpenClaw doctor\n│\n◇  Doctor changes\n│  WhatsApp configured, not enabled yet.\n│\n└  Doctor complete.`;
-            else if (action === 'fix') detail = `✓ Tightened permissions on ~/.openclaw\n✓ Created Session store dir\n✓ Enabled systemd lingering\n✓ Restarted gateway service`;
-            else detail = "Action completed.";
+            let event = "";
+            if (action === 'start') {
+              detail = "Gateway started on pid 1589.";
+              event = "Service START dispatched.";
+            } else if (action === 'stop') {
+              detail = "Gateway service stopped.";
+              event = "Service STOP dispatched.";
+            } else if (action === 'doctor') {
+              detail = `┌  OpenClaw doctor\n│\n◇  Doctor changes\n│  WhatsApp configured, not enabled yet.\n│\n└  Doctor complete.`;
+              event = "Doctor check complete.";
+            } else if (action === 'fix') {
+              detail = `✓ Tightened permissions on ~/.openclaw\n✓ Created Session store dir\n✓ Enabled systemd lingering\n✓ Restarted gateway service`;
+              event = "System fix applied.";
+            } else detail = "Action completed.";
             
+            // Side effect: update dashboard event log
+            const currentStats = useDashboard.getState().stats;
+            if (currentStats && currentStats.openClaw) {
+              useDashboard.getState().setStats({
+                ...currentStats,
+                openClaw: { ...currentStats.openClaw, lastEvent: event }
+              });
+            }
+
             simulatedOutput = detail;
             executionMessage = `🎮 **OPENCLAW ENGINE**: Action \`${action}\` dispatched\n\n\`\`\`bash\n${detail}\n\`\`\``;
           } else if (fc.name === 'openvpn_control') {
             const { command } = fc.args;
             let vpnLog = "";
+            let vpnActive = false;
             if (command === 'status') vpnLog = "OpenVPN: inactive (dead)";
-            else if (command === 'start') vpnLog = "Starting OpenVPN tunnel... [OK]";
-            else vpnLog = "OpenVPN command processed.";
+            else if (command === 'start') {
+              vpnLog = "Starting OpenVPN tunnel... [OK]";
+              vpnActive = true;
+            } else vpnLog = "OpenVPN command processed.";
+
+            // Side effect: update dashboard VPN status
+            const currentStats = useDashboard.getState().stats;
+            if (currentStats && currentStats.openClaw) {
+              useDashboard.getState().setStats({
+                ...currentStats,
+                openClaw: { ...currentStats.openClaw, vpnActive, lastEvent: `VPN ${command.toUpperCase()}` }
+              });
+            }
 
             simulatedOutput = vpnLog;
             executionMessage = `🔒 **VPN CONTROL**: root@168.231.78.113\n\n\`\`\`bash\n${vpnLog}\n\`\`\``;

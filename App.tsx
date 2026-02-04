@@ -22,7 +22,7 @@
 import ControlTray from './components/console/control-tray/ControlTray';
 import ErrorScreen from './components/demo/ErrorScreen';
 import StreamingConsole from './components/demo/streaming-console/StreamingConsole';
-import VpsDashboard from './components/demo/VpsDashboard';
+import OpenClawDashboard from './components/demo/OpenClawDashboard';
 
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -46,7 +46,7 @@ function App() {
           <main>
             <div className="main-app-area">
               <StreamingConsole />
-              <VpsDashboard />
+              <OpenClawDashboard />
             </div>
 
             <ControlTray></ControlTray>
