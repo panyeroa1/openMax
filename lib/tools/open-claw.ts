@@ -25,6 +25,27 @@ export const openClawTools: FunctionCall[] = [
     scheduling: FunctionResponseScheduling.INTERRUPT,
   },
   {
+    name: 'get_vps_logs',
+    description: 'Retrieves the latest logs from the VPS. Specifically useful for debugging services.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        log_type: { 
+          type: 'STRING', 
+          enum: ['gateway', 'system', 'auth', 'openvpn'],
+          description: 'The type of log to retrieve.' 
+        },
+        lines: {
+          type: 'NUMBER',
+          description: 'Number of lines to fetch (default is 20).'
+        }
+      },
+      required: ['log_type'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
     name: 'get_system_stats',
     description: 'Retrieves current system resource usage (CPU, Memory, Disk, Uptime) for the VPS 168.231.78.113.',
     parameters: {
@@ -113,36 +134,5 @@ export const openClawTools: FunctionCall[] = [
     },
     isEnabled: true,
     scheduling: FunctionResponseScheduling.INTERRUPT
-  },
-  {
-    name: 'move_arm',
-    description: 'Moves the robotic arm (if connected via I/O) to specific coordinates.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        x: { type: 'NUMBER' },
-        y: { type: 'NUMBER' },
-        z: { type: 'NUMBER' },
-      },
-      required: ['x', 'y', 'z'],
-    },
-    isEnabled: true,
-    scheduling: FunctionResponseScheduling.INTERRUPT,
-  },
-  {
-    name: 'operate_claw',
-    description: 'Opens or closes the physical robotic claw gripper.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        action: { 
-          type: 'STRING', 
-          enum: ['open', 'close']
-        },
-      },
-      required: ['action'],
-    },
-    isEnabled: true,
-    scheduling: FunctionResponseScheduling.INTERRUPT,
   },
 ];

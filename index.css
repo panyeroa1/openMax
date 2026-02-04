@@ -38,6 +38,7 @@ body {
   font-family: var(--font-sans);
   overflow: hidden;
   height: 100vh;
+  width: 100vw;
 }
 
 /* Layout */
@@ -45,6 +46,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100vw;
 }
 
 .main-header {
@@ -55,6 +57,7 @@ body {
   z-index: 50;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .header-content {
@@ -138,6 +141,7 @@ body {
 .streaming-console {
   flex: 1;
   display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
 }
@@ -147,6 +151,7 @@ main {
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
 
 .main-app-area {
@@ -258,6 +263,7 @@ pre {
   align-items: center;
   position: relative;
   z-index: 60;
+  flex-shrink: 0;
 }
 
 .tray-inner {
@@ -367,14 +373,15 @@ pre {
 
 /* Sidebar Overrides */
 .sidebar {
-  position: absolute;
-  top: 72px;
-  bottom: 80px;
-  right: -400px;
-  width: 360px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: -100%;
+  width: 100%;
+  max-width: 360px;
   background: var(--surface);
   border-left: 1px solid var(--border);
-  z-index: 100;
+  z-index: 1000;
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
@@ -401,9 +408,8 @@ pre {
 /* Dashboard Tweaks */
 .openclaw-dashboard {
   position: relative;
-  top: 0;
-  right: 0;
   width: 360px;
+  flex-shrink: 0;
   height: 100%;
   background: rgba(10, 10, 10, 0.7);
   backdrop-filter: blur(10px);
@@ -411,6 +417,254 @@ pre {
   border-radius: 12px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Dashboard Sections */
+.dashboard-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-title {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--gray-500);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.resource-item {
+  margin-bottom: 12px;
+}
+
+.resource-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.resource-track {
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.resource-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Service Status */
+.service-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.03);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.active {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.status-indicator.inactive {
+  background: var(--gray-700);
+}
+
+.service-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.service-pid {
+  font-size: 9px;
+  color: var(--gray-500);
+  font-family: var(--font-mono);
+  margin-left: 8px;
+}
+
+/* Matrix Stats */
+.matrix-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.matrix-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.matrix-label {
+  font-size: 9px;
+  color: var(--gray-500);
+}
+
+.matrix-value {
+  font-size: 16px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+}
+
+/* Global Responsive Overrides */
+@media (max-width: 1200px) {
+  .openclaw-dashboard {
+    width: 300px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .main-app-area {
+    flex-direction: column;
+    padding: 12px;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .openclaw-dashboard {
+    width: 100%;
+    height: auto;
+    flex-shrink: 0;
+    max-height: none;
+    order: 1; /* Move dashboard after console if needed, or keep at top */
+  }
+
+  .transcription-container {
+    height: 60vh; /* Fixed height on smaller screens to ensure visibility */
+    min-height: 400px;
+    order: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    padding: 0 16px;
+  }
+
+  .header-center, .system-clock {
+    display: none;
+  }
+  
+  .logo-text h1 span {
+    display: none;
+  }
+
+  .logo-text p {
+    font-size: 8px;
+  }
+
+  .vps-badge {
+    padding: 4px 12px;
+    font-size: 10px;
+  }
+
+  .main-app-area {
+    padding: 8px;
+  }
+
+  .transcription-view {
+    padding: 16px;
+  }
+
+  .transcription-entry {
+    max-width: 95%;
+  }
+
+  .transcription-text-content {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  /* Compact Control Tray */
+  .control-tray {
+    height: 72px;
+    padding: 0 16px;
+  }
+
+  .toggle-label {
+    display: none;
+  }
+
+  .connect-toggle {
+    padding: 8px 12px;
+    border-radius: 50%;
+  }
+
+  .action-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .tray-center {
+    display: none;
+  }
+
+  .matrix-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Portrait Specific Optimization */
+@media (max-width: 480px) and (orientation: portrait) {
+  .main-header {
+    height: 64px;
+  }
+
+  .logo-icon {
+    font-size: 24px;
+  }
+
+  .logo-text h1 {
+    font-size: 15px;
+  }
+
+  .main-app-area {
+    gap: 8px;
+  }
+
+  .transcription-container {
+    height: 55vh;
+  }
+
+  .openclaw-dashboard {
+    padding-bottom: 12px;
+  }
+
+  .dashboard-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tray-left .divider {
+    display: none;
+  }
+
+  .action-button:nth-child(n+3) {
+    display: none; /* Hide non-essential buttons on very narrow screens */
+  }
+
+  .sidebar {
+    max-width: 100%;
+  }
 }
 
 /* Scrollbar */

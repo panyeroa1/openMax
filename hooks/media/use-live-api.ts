@@ -149,9 +149,20 @@ export function useLiveApi({
             const output = simulateSSHOutput(fc.args.command);
             simulatedOutput = output;
             executionMessage = `💻 **TERMINAL**: root@168.231.78.113\n$ \`${fc.args.command}\`\n\n\`\`\`bash\n${output}\n\`\`\``;
+          } else if (fc.name === 'get_vps_logs') {
+            const { log_type, lines = 20 } = fc.args;
+            let logContent = `[${new Date().toISOString()}] INFO: System log stream initialized.\n`;
+            if (log_type === 'gateway') {
+              logContent += `[Gateway] Listening on 127.0.0.1:18789\n[Gateway] Plugin 'whatsapp' loaded successfully\n[Gateway] Session 'eburon-01' resumed.`;
+            } else if (log_type === 'auth') {
+              logContent += `Feb 5 12:00:01 openmax sshd[1234]: Accepted publickey for root from 1.2.3.4\nFeb 5 12:05:22 openmax sudo: pam_unix(sudo:session): session opened for user root`;
+            } else {
+              logContent += `Standard ${log_type} output truncated to ${lines} lines.`;
+            }
+            simulatedOutput = logContent;
+            executionMessage = `📄 **LOG VIEWER**: root@168.231.78.113\n$ \`tail -n ${lines} /var/log/openmax/${log_type}.log\`\n\n\`\`\`bash\n${logContent}\n\`\`\``;
           } else if (fc.name === 'get_system_stats') {
             isSilent = true;
-            // Enhanced stats derived from OpenClaw context
             const stats = {
               cpu: Math.floor(Math.random() * 5) + 1, 
               memory: 1, 
@@ -189,7 +200,6 @@ export function useLiveApi({
               event = "System fix applied.";
             } else detail = "Action completed.";
             
-            // Side effect: update dashboard event log
             const currentStats = useDashboard.getState().stats;
             if (currentStats && currentStats.openClaw) {
               useDashboard.getState().setStats({
@@ -210,7 +220,6 @@ export function useLiveApi({
               vpnActive = true;
             } else vpnLog = "OpenVPN command processed.";
 
-            // Side effect: update dashboard VPN status
             const currentStats = useDashboard.getState().stats;
             if (currentStats && currentStats.openClaw) {
               useDashboard.getState().setStats({
@@ -248,7 +257,6 @@ export function useLiveApi({
           }
         }
 
-        // Log the function call trigger to the visual console if not silent
         if (!isSilent) {
           useLogStore.getState().addTurn({
             role: 'system',
@@ -257,7 +265,6 @@ export function useLiveApi({
           });
         }
 
-        // Prepare the response for the model
         functionResponses.push({
           id: fc.id,
           name: fc.name,
@@ -270,7 +277,6 @@ export function useLiveApi({
         });
       }
 
-      // Log the full technical response if not silent
       if (functionResponses.length > 0 && !functionResponses.every(r => r.name === 'get_system_stats')) {
         const responseMessage = `Technical metadata from VPS:\n\`\`\`json\n${JSON.stringify(
           functionResponses,
@@ -290,7 +296,6 @@ export function useLiveApi({
     client.on('toolcall', onToolCall);
 
     return () => {
-      // Clean up event listeners
       client.off('open', onOpen);
       client.off('close', onClose);
       client.off('interrupted', stopAudioStreamer);
