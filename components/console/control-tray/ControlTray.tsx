@@ -42,14 +42,80 @@ function ControlTray({ children }: ControlTrayProps) {
         },
       ]);
     };
+
+    // Idle Detection Logic
+    const lastSpeechTime = useRef<number>(Date.now());
+    const hasTriggeredIdle = useRef<boolean>(false);
+
+    // Check for idle every 500ms
+    useEffect(() => {
+      let intervalId: NodeJS.Timeout | null = null;
+
+      if (connected && !muted) {
+        // Reset timestamp on connect/unmute
+        lastSpeechTime.current = Date.now();
+        hasTriggeredIdle.current = false;
+
+        intervalId = setInterval(() => {
+          const now = Date.now();
+          const timeSinceSpeech = now - lastSpeechTime.current;
+
+          // 5 seconds silence threshold
+          if (timeSinceSpeech > 5000 && !hasTriggeredIdle.current) {
+
+            const IDLE_PROMPTS = [
+              "give me update",
+              "ask me why I am silent",
+              "tell a joke related to our conversation",
+              "make a humorous observation about the silence",
+              "ask if I am still there in a funny way"
+            ];
+
+            const randomPrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
+
+            console.log(`User idle for 5s, sending prompt: "${randomPrompt}"`);
+            client.send([{ text: randomPrompt }]);
+
+            // Mark as triggered so we don't spam
+            hasTriggeredIdle.current = true;
+
+            // Add a system log entry for visibility
+            useLogStore.getState().addTurn({
+              role: 'system',
+              text: `⏱️ [Auto-Action] User detected idle (5s). Sent: "${randomPrompt}"`,
+              isFinal: true
+            });
+          }
+        }, 500);
+      }
+
+      return () => {
+        if (intervalId) clearInterval(intervalId);
+      };
+    }, [connected, muted, client]);
+
+    const onVolume = (volume: number) => {
+      // Threshold for "detected speech"
+      if (volume > 0.01) {
+        lastSpeechTime.current = Date.now();
+        // Reset trigger if we were idle, allowing detected speech to re-arm the timer
+        // However, we only re-arm if we had previously triggered, or just keeping it fresh.
+        if (hasTriggeredIdle.current) {
+          hasTriggeredIdle.current = false;
+        }
+      }
+    };
+
     if (connected && !muted && audioRecorder) {
       audioRecorder.on('data', onData);
+      audioRecorder.on('volume', onVolume);
       audioRecorder.start().catch((e: any) => console.error('AudioRecorder error:', e));
     } else {
       audioRecorder.stop();
     }
     return () => {
       audioRecorder.off('data', onData);
+      audioRecorder.off('volume', onVolume);
     };
   }, [connected, client, muted, audioRecorder]);
 

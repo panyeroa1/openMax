@@ -31,6 +31,9 @@ import WebView from './components/WebView';
 import { LiveAPIProvider } from './contexts/LiveAPIContext';
 import { useUI, useAuth } from './lib/state';
 
+// FIX: Import ChatInput
+import ChatInput from './components/console/chat-input/ChatInput';
+
 const API_KEY = process.env.API_KEY as string;
 
 function App() {
@@ -59,7 +62,19 @@ function App() {
                   {isWebViewActive && <WebView />}
                 </div>
 
-                <ControlTray></ControlTray>
+                {/* Chat Input Area */}
+                <div className="bottom-controls-area" style={{
+                  position: 'fixed',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  zIndex: 200 // Ensure it's above other content
+                }}>
+                  <ChatInput />
+                  <ControlTray />
+                </div>
               </main>
             </div>
           </>
@@ -68,6 +83,5 @@ function App() {
     </div>
   );
 }
-
 
 export default App;
