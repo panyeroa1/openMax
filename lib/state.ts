@@ -289,8 +289,12 @@ export const useUI = create<{
   isCommandCenterOpen: boolean;
   isWebViewActive: boolean;
   webViewUrl: string;
+  isChatInputOpen: boolean;
+  sharedFiles: Array<{ name: string; type: string; data?: string }>;
   toggleSidebar: () => void;
   toggleDashboard: () => void;
+  toggleChatInput: () => void;
+  addSharedFile: (file: { name: string; type: string; data?: string }) => void;
   setCommandCenter: (open: boolean) => void;
   setWebView: (active: boolean, url?: string) => void;
 }>(set => ({
@@ -299,8 +303,12 @@ export const useUI = create<{
   isCommandCenterOpen: true,
   isWebViewActive: false,
   webViewUrl: '',
+  isChatInputOpen: true, // Default to true for now or false if preferred
+  sharedFiles: [],
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen, isDashboardOpen: false })),
   toggleDashboard: () => set(state => ({ isDashboardOpen: !state.isDashboardOpen, isSidebarOpen: false })),
+  toggleChatInput: () => set(state => ({ isChatInputOpen: !state.isChatInputOpen })),
+  addSharedFile: (file) => set(state => ({ sharedFiles: [...state.sharedFiles, file] })),
   setCommandCenter: (open) => set({ isCommandCenterOpen: open }),
   setWebView: (active, url) => set({
     isWebViewActive: active,

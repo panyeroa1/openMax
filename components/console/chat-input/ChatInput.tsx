@@ -4,7 +4,7 @@
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
-import { useLogStore } from '@/lib/state';
+import { useLogStore, useUI } from '@/lib/state';
 
 export default function ChatInput() {
     const { client, connected } = useLiveAPIContext();
@@ -24,9 +24,10 @@ export default function ChatInput() {
     const handleSend = async () => {
         if (!text.trim() && files.length === 0) return;
 
-        // 1. Send Text
+        // 1. Send Text + Notifications for files
+        const parts: any[] = [];
         if (text.trim()) {
-            client.send([{ text: text.trim() }]);
+            parts.push({ text: text.trim() });
             useLogStore.getState().addTurn({
                 role: 'user',
                 text: text.trim(),
@@ -34,26 +35,32 @@ export default function ChatInput() {
             });
         }
 
-        // 2. Send Files
         if (files.length > 0) {
             for (const file of files) {
                 const base64 = await fileToBase64(file);
                 const mimeType = file.type;
 
-                // Log the file upload for visibility
+                // Save to global shared state
+                useUI.getState().addSharedFile({
+                    name: file.name,
+                    type: mimeType,
+                    data: base64
+                });
+
+                // Notify AI about the file
+                const notification = `[SYSTEM • UPLOAD]: Milord has pointed you to a new file: "${file.name}" (${mimeType}). It is now in your local workspace. [sighs] You can use 'bring_to_vps' to move it to the server if required.`;
+                parts.push({ text: notification });
+
                 useLogStore.getState().addTurn({
                     role: 'user',
                     text: `[Sent File]: ${file.name} (${mimeType})`,
                     isFinal: true,
                 });
-
-                // Send as RealtimeInput (media) if supported, or inline data part
-                // Using sendRealtimeInput for media chunks is typical for this client
-                client.sendRealtimeInput([{
-                    mimeType: mimeType,
-                    data: base64
-                }]);
             }
+        }
+
+        if (parts.length > 0) {
+            client.send(parts);
         }
 
         setText('');
@@ -92,7 +99,9 @@ export default function ChatInput() {
         });
     };
 
-    if (!connected) return null;
+    const isChatInputOpen = useUI(state => state.isChatInputOpen);
+
+    if (!connected || !isChatInputOpen) return null;
 
     return (
         <div className="chat-input-container">
@@ -101,6 +110,7 @@ export default function ChatInput() {
                 <div className="file-preview-list">
                     {files.map((file, i) => (
                         <div key={i} className="file-preview-item">
+                            <span className="material-symbols-outlined file-preview-icon">description</span>
                             <span className="file-name">{file.name}</span>
                             <button
                                 onClick={() => removeFile(i)}
@@ -117,12 +127,12 @@ export default function ChatInput() {
             {/* Input Area */}
             <div className="chat-input-row">
                 <button
-                    className="icon-button attach-btn"
+                    className="tray-action-btn attach-btn"
                     onClick={() => fileInputRef.current?.click()}
                     title="Attach file"
                     aria-label="Attach file"
                 >
-                    <span className="material-symbols-outlined">attach_file</span>
+                    <span className="material-symbols-outlined">add_circle</span>
                 </button>
                 <input
                     type="file"
@@ -133,19 +143,21 @@ export default function ChatInput() {
                     title="File upload"
                 />
 
-                <textarea
-                    ref={textareaRef}
-                    className="chat-textarea"
-                    rows={1}
-                    placeholder="Type a message to Orbit..."
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    title="Message input"
-                />
+                <div className="textarea-wrapper">
+                    <textarea
+                        ref={textareaRef}
+                        className="chat-textarea"
+                        rows={1}
+                        placeholder="Milord, type a message or upload files..."
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        title="Message input"
+                    />
+                </div>
 
                 <button
-                    className="icon-button send-btn"
+                    className="tray-action-btn send-btn"
                     onClick={handleSend}
                     disabled={!text.trim() && files.length === 0}
                     title="Send"

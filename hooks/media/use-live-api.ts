@@ -25,7 +25,7 @@ import { LiveConnectConfig, Modality, LiveServerToolCall } from '@google/genai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
-import { useLogStore, useSettings, useTools, useDashboard, OpenClawStats } from '@/lib/state';
+import { useLogStore, useSettings, useTools, useDashboard, useUI, OpenClawStats } from '@/lib/state';
 
 export type UseLiveApiResults = {
   client: GenAILiveClient;
@@ -37,41 +37,6 @@ export type UseLiveApiResults = {
   connected: boolean;
 
   volume: number;
-};
-
-// Helper to simulate realistic SSH command outputs for OpenClaw environment
-const simulateSSHOutput = (command: string): string => {
-  const cmd = command.toLowerCase().trim();
-  
-  if (cmd.includes('ls')) {
-    return `bin/  CMakeLists.txt  data/  docs/  include/  LICENSE  README.md  res/  src/  tests/`;
-  }
-  if (cmd.includes('df -h')) {
-    return `Filesystem      Size  Used Avail Use% Mounted on
-/dev/sda1       192.69GB  4.05GB  188.64GB   2.1% /
-udev            3.9G     0  3.9G   0% /dev
-tmpfs           798M  1.1M  797M   1% /run`;
-  }
-  if (cmd.includes('uptime')) {
-    return ` 21:22:36 up 14 days,  1:12,  1 user,  load average: 0.00, 0.01, 0.00`;
-  }
-  if (cmd.includes('whoami')) {
-    return `root`;
-  }
-  if (cmd.includes('openclaw doctor')) {
-    return `┌  OpenClaw doctor
-│
-◇  Doctor changes
-│  WhatsApp configured, not enabled yet.
-│
-◇  Gateway connection
-│  Gateway target: ws://127.0.0.1:18789
-│  Source: local loopback
-│
-└  Doctor complete.`;
-  }
-  
-  return `[Command processed on 168.231.78.113]`;
 };
 
 export function useLiveApi({
@@ -87,6 +52,48 @@ export function useLiveApi({
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({});
+
+  // Track files that have been "brought" to the VPS in this session
+  const [vpsFiles, setVpsFiles] = useState<string[]>([]);
+
+  // Helper to simulate realistic SSH command outputs for OpenClaw environment
+  const simulateSSHOutput = useCallback((command: string): string => {
+    const cmd = command.toLowerCase().trim();
+
+    if (cmd.includes('ls')) {
+      const baseFiles = `bin/  CMakeLists.txt  data/  docs/  include/  LICENSE  README.md  res/  src/  tests/`;
+      if (vpsFiles.length > 0) {
+        return `${baseFiles}  ${vpsFiles.join('  ')}`;
+      }
+      return baseFiles;
+    }
+    if (cmd.includes('df -h')) {
+      return `Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1       192.69GB  4.05GB  188.64GB   2.1% /
+udev            3.9G     0  3.9G   0% /dev
+tmpfs           798M  1.1M  797M   1% /run`;
+    }
+    if (cmd.includes('uptime')) {
+      return ` 21:22:36 up 14 days,  1:12,  1 user,  load average: 0.00, 0.01, 0.00`;
+    }
+    if (cmd.includes('whoami')) {
+      return `root`;
+    }
+    if (cmd.includes('openclaw doctor')) {
+      return `┌  OpenClaw doctor
+│
+◇  Doctor changes
+│  WhatsApp configured, not enabled yet.
+│
+◇  Gateway connection
+│  Gateway target: ws://127.0.0.1:18789
+│  Source: local loopback
+│
+└  Doctor complete.`;
+    }
+
+    return `[Command processed on 168.231.78.113]`;
+  }, [vpsFiles]);
 
   // register audio for streaming server -> speakers
   useEffect(() => {
@@ -142,30 +149,31 @@ export function useLiveApi({
         let executionMessage = `Triggering function call: **${fc.name}**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
         let simulatedOutput = "ok";
         let isSilent = false;
-        
+
         // Specialized Simulation for OpenClaw project
-        if (currentTemplate === 'open-claw') {
+        if (currentTemplate === 'orbit-agent') {
           if (fc.name === 'execute_ssh_command') {
             const output = simulateSSHOutput(fc.args.command);
             simulatedOutput = output;
             executionMessage = `💻 **TERMINAL**: root@168.231.78.113\n$ \`${fc.args.command}\`\n\n\`\`\`bash\n${output}\n\`\`\``;
-          } else if (fc.name === 'get_vps_logs') {
-            const { log_type, lines = 20 } = fc.args;
-            let logContent = `[${new Date().toISOString()}] INFO: System log stream initialized.\n`;
-            if (log_type === 'gateway') {
-              logContent += `[Gateway] Listening on 127.0.0.1:18789\n[Gateway] Plugin 'whatsapp' loaded successfully\n[Gateway] Session 'eburon-01' resumed.`;
-            } else if (log_type === 'auth') {
-              logContent += `Feb 5 12:00:01 openmax sshd[1234]: Accepted publickey for root from 1.2.3.4\nFeb 5 12:05:22 openmax sudo: pam_unix(sudo:session): session opened for user root`;
+          } else if (fc.name === 'bring_to_vps') {
+            const { filename } = fc.args;
+            const sharedFiles = useUI.getState().sharedFiles;
+            const fileExists = sharedFiles.some(f => f.name === filename);
+
+            if (fileExists) {
+              setVpsFiles(prev => [...new Set([...prev, filename])]);
+              simulatedOutput = `File "${filename}" successfully transferred to /root/ on VPS 168.231.78.113.`;
+              executionMessage = `🚀 **TRANSFER**: root@168.231.78.113\n$ \`scp local://${filename} root@1 address:/root/\`\n\n\`\`\`bash\n${simulatedOutput}\n\`\`\``;
             } else {
-              logContent += `Standard ${log_type} output truncated to ${lines} lines.`;
+              simulatedOutput = `Error: File "${filename}" not found in local shared directory.`;
+              executionMessage = `❌ **TRANSFER FAILED**: File not found.`;
             }
-            simulatedOutput = logContent;
-            executionMessage = `📄 **LOG VIEWER**: root@168.231.78.113\n$ \`tail -n ${lines} /var/log/openmax/${log_type}.log\`\n\n\`\`\`bash\n${logContent}\n\`\`\``;
           } else if (fc.name === 'get_system_stats') {
             isSilent = true;
             const stats = {
-              cpu: Math.floor(Math.random() * 5) + 1, 
-              memory: 1, 
+              cpu: Math.floor(Math.random() * 5) + 1,
+              memory: 1,
               disk: 2.1,
               uptime: "14d 1h 12m",
               lastUpdated: new Date(),
@@ -183,7 +191,7 @@ export function useLiveApi({
             useDashboard.getState().setStats(stats);
             simulatedOutput = JSON.stringify(stats);
           } else if (fc.name === 'manage_openclaw') {
-            const { action } = fc.args;
+            const { action } = fc.args as any;
             let detail = "";
             let event = "";
             if (action === 'start') {
@@ -199,7 +207,7 @@ export function useLiveApi({
               detail = `✓ Tightened permissions on ~/.openclaw\n✓ Created Session store dir\n✓ Enabled systemd lingering\n✓ Restarted gateway service`;
               event = "System fix applied.";
             } else detail = "Action completed.";
-            
+
             const currentStats = useDashboard.getState().stats;
             if (currentStats && currentStats.openClaw) {
               useDashboard.getState().setStats({
@@ -211,7 +219,7 @@ export function useLiveApi({
             simulatedOutput = detail;
             executionMessage = `🎮 **OPENCLAW ENGINE**: Action \`${action}\` dispatched\n\n\`\`\`bash\n${detail}\n\`\`\``;
           } else if (fc.name === 'openvpn_control') {
-            const { command } = fc.args;
+            const { command } = fc.args as any;
             let vpnLog = "";
             let vpnActive = false;
             if (command === 'status') vpnLog = "OpenVPN: inactive (dead)";
@@ -224,14 +232,14 @@ export function useLiveApi({
             if (currentStats && currentStats.openClaw) {
               useDashboard.getState().setStats({
                 ...currentStats,
-                openClaw: { ...currentStats.openClaw, vpnActive, lastEvent: `VPN ${command.toUpperCase()}` }
+                openClaw: { ...currentStats.openClaw, vpnActive, lastEvent: `VPN ${(command as string).toUpperCase()}` }
               });
             }
 
             simulatedOutput = vpnLog;
             executionMessage = `🔒 **VPN CONTROL**: root@168.231.78.113\n\n\`\`\`bash\n${vpnLog}\n\`\`\``;
           } else if (fc.name === 'repository_control') {
-            const { command } = fc.args;
+            const { command } = fc.args as any;
             let gitLog = "";
             if (command === 'pull') {
               gitLog = "Updating 9c5941b..a1b2c3d\nFast-forward\n src/core.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)";
@@ -250,7 +258,7 @@ export function useLiveApi({
             simulatedOutput = gitLog;
             executionMessage = `📂 **GIT CONTROL**: root@168.231.78.113\n$ \`git ${command}\`\n\n\`\`\`bash\n${gitLog}\n\`\`\``;
           } else if (fc.name === 'hostinger_vps_api') {
-            const { action } = fc.args;
+            const { action } = fc.args as any;
             const res = { status: 'success', server_id: 'srv909561', action_triggered: action };
             simulatedOutput = JSON.stringify(res);
             executionMessage = `🌩️ **HOSTINGER API**: Action \`${action}\` sent to Hostinger Control Panel.\n\n\`\`\`json\n${simulatedOutput}\n\`\`\``;
@@ -268,12 +276,12 @@ export function useLiveApi({
         functionResponses.push({
           id: fc.id,
           name: fc.name,
-          response: { 
-            result: simulatedOutput, 
-            status: 'success', 
-            host: '168.231.78.113', 
-            timestamp: new Date().toISOString() 
-          }, 
+          response: {
+            result: simulatedOutput,
+            status: 'success',
+            host: '168.231.78.113',
+            timestamp: new Date().toISOString()
+          },
         });
       }
 

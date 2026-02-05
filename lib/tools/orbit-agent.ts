@@ -146,6 +146,22 @@ export const orbitTools: FunctionCall[] = [
     scheduling: FunctionResponseScheduling.INTERRUPT,
   },
   {
+    name: 'bring_to_vps',
+    description: 'Transfers an uploaded file from the local workspace to the remote VPS (168.231.78.113).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        filename: {
+          type: 'STRING',
+          description: 'The name of the file to transfer (must be one of the files Milord uploaded).'
+        },
+      },
+      required: ['filename'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
     name: 'report_to_boss',
     description: 'Sends a silent status update message to the Boss (User) during background tasks or multi-step operations. Use this to report progress without interrupting the flow.',
     parameters: {

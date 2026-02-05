@@ -18,8 +18,8 @@ function ControlTray({ children }: ControlTrayProps) {
   const [muted, setMuted] = useState(false);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
 
+  const { toggleSidebar } = useUI();
   const { client, connected, connect, disconnect } = useLiveAPIContext();
-  const { isDashboardOpen, toggleDashboard, toggleSidebar } = useUI();
 
   useEffect(() => {
     if (!connected && connectButtonRef.current) {
@@ -33,6 +33,7 @@ function ControlTray({ children }: ControlTrayProps) {
     }
   }, [connected]);
 
+  // Audio recording
   useEffect(() => {
     const onData = (base64: string) => {
       client.sendRealtimeInput([
@@ -43,79 +44,14 @@ function ControlTray({ children }: ControlTrayProps) {
       ]);
     };
 
-    // Idle Detection Logic
-    const lastSpeechTime = useRef<number>(Date.now());
-    const hasTriggeredIdle = useRef<boolean>(false);
-
-    // Check for idle every 500ms
-    useEffect(() => {
-      let intervalId: NodeJS.Timeout | null = null;
-
-      if (connected && !muted) {
-        // Reset timestamp on connect/unmute
-        lastSpeechTime.current = Date.now();
-        hasTriggeredIdle.current = false;
-
-        intervalId = setInterval(() => {
-          const now = Date.now();
-          const timeSinceSpeech = now - lastSpeechTime.current;
-
-          // 5 seconds silence threshold
-          if (timeSinceSpeech > 5000 && !hasTriggeredIdle.current) {
-
-            const IDLE_PROMPTS = [
-              "give me update",
-              "ask me why I am silent",
-              "tell a joke related to our conversation",
-              "make a humorous observation about the silence",
-              "ask if I am still there in a funny way"
-            ];
-
-            const randomPrompt = IDLE_PROMPTS[Math.floor(Math.random() * IDLE_PROMPTS.length)];
-
-            console.log(`User idle for 5s, sending prompt: "${randomPrompt}"`);
-            client.send([{ text: randomPrompt }]);
-
-            // Mark as triggered so we don't spam
-            hasTriggeredIdle.current = true;
-
-            // Add a system log entry for visibility
-            useLogStore.getState().addTurn({
-              role: 'system',
-              text: `⏱️ [Auto-Action] User detected idle (5s). Sent: "${randomPrompt}"`,
-              isFinal: true
-            });
-          }
-        }, 500);
-      }
-
-      return () => {
-        if (intervalId) clearInterval(intervalId);
-      };
-    }, [connected, muted, client]);
-
-    const onVolume = (volume: number) => {
-      // Threshold for "detected speech"
-      if (volume > 0.01) {
-        lastSpeechTime.current = Date.now();
-        // Reset trigger if we were idle, allowing detected speech to re-arm the timer
-        // However, we only re-arm if we had previously triggered, or just keeping it fresh.
-        if (hasTriggeredIdle.current) {
-          hasTriggeredIdle.current = false;
-        }
-      }
-    };
-
     if (connected && !muted && audioRecorder) {
       audioRecorder.on('data', onData);
-      audioRecorder.on('volume', onVolume);
       audioRecorder.start().catch((e: any) => console.error('AudioRecorder error:', e));
     } else {
       audioRecorder.stop();
     }
     return () => {
       audioRecorder.off('data', onData);
-      audioRecorder.off('volume', onVolume);
     };
   }, [connected, client, muted, audioRecorder]);
 
@@ -184,11 +120,11 @@ function ControlTray({ children }: ControlTrayProps) {
           <div className="divider"></div>
 
           <button
-            className={cn('action-button', { active: isDashboardOpen })}
-            onClick={toggleDashboard}
-            title="Toggle Dashboard"
+            className={cn('action-button', { active: useUI.getState().isChatInputOpen })}
+            onClick={useUI.getState().toggleChatInput}
+            title="Toggle Chat Input"
           >
-            <span className="material-symbols-outlined">analytics</span>
+            <span className="material-symbols-outlined">chat</span>
           </button>
 
           <button
@@ -197,14 +133,6 @@ function ControlTray({ children }: ControlTrayProps) {
             title="Open Settings"
           >
             <span className="material-symbols-outlined">settings</span>
-          </button>
-
-          <button
-            className="action-button"
-            onClick={handleExportLogs}
-            title="Export session logs"
-          >
-            <span className="material-symbols-outlined">download</span>
           </button>
 
           <button
