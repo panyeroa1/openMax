@@ -2,7 +2,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
-*/
+ */
 /**
  * Copyright 2024 Google LLC
  *
@@ -22,39 +22,52 @@
 import ControlTray from './components/console/control-tray/ControlTray';
 import ErrorScreen from './components/demo/ErrorScreen';
 import StreamingConsole from './components/demo/streaming-console/StreamingConsole';
-import OpenClawDashboard from './components/demo/OpenClawDashboard';
-
+import OrbitDashboard from './components/demo/OrbitDashboard';
+import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import CommandCenter from './components/CommandCenter';
+import WebView from './components/WebView';
 import { LiveAPIProvider } from './contexts/LiveAPIContext';
+import { useUI, useAuth } from './lib/state';
 
-// Mandatory environment variable check using process.env.API_KEY as per instructions
 const API_KEY = process.env.API_KEY as string;
 
-/**
- * Main application component that provides a streaming interface for Live API.
- * Manages video streaming state and provides controls for webcam/screen capture.
- */
 function App() {
+  const { isDashboardOpen, isCommandCenterOpen, isWebViewActive } = useUI();
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <AuthScreen />;
+  }
+
   return (
     <div className="App">
       <LiveAPIProvider apiKey={API_KEY}>
         <ErrorScreen />
-        <Header />
-        <Sidebar />
-        <div className="streaming-console">
-          <main>
-            <div className="main-app-area">
-              <StreamingConsole />
-              <OpenClawDashboard />
-            </div>
+        {isCommandCenterOpen ? (
+          <CommandCenter />
+        ) : (
+          <>
+            <Header />
+            <Sidebar />
+            <div className="streaming-console">
+              <main>
+                <div className={`main-app-area ${isDashboardOpen ? 'dashboard-open' : ''}`}>
+                  <StreamingConsole />
+                  {isDashboardOpen && <OrbitDashboard />}
+                  {isWebViewActive && <WebView />}
+                </div>
 
-            <ControlTray></ControlTray>
-          </main>
-        </div>
+                <ControlTray></ControlTray>
+              </main>
+            </div>
+          </>
+        )}
       </LiveAPIProvider>
     </div>
   );
 }
+
 
 export default App;

@@ -7,40 +7,19 @@
 import { FunctionResponseScheduling } from '@google/genai';
 import { FunctionCall } from '../state';
 
-export const openClawTools: FunctionCall[] = [
+export const orbitTools: FunctionCall[] = [
   {
     name: 'execute_ssh_command',
     description: 'Executes a Linux shell command on the remote VPS (168.231.78.113). Use this for any system-level tasks.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        command: { 
-          type: 'STRING', 
-          description: 'The shell command to execute (e.g., ls, top, df -h, tail -f logs).' 
+        command: {
+          type: 'STRING',
+          description: 'The shell command to execute (e.g., ls, top, df -h, tail -f logs).'
         },
       },
       required: ['command'],
-    },
-    isEnabled: true,
-    scheduling: FunctionResponseScheduling.INTERRUPT,
-  },
-  {
-    name: 'get_vps_logs',
-    description: 'Retrieves the latest logs from the VPS. Specifically useful for debugging services.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        log_type: { 
-          type: 'STRING', 
-          enum: ['gateway', 'system', 'auth', 'openvpn'],
-          description: 'The type of log to retrieve.' 
-        },
-        lines: {
-          type: 'NUMBER',
-          description: 'Number of lines to fetch (default is 20).'
-        }
-      },
-      required: ['log_type'],
     },
     isEnabled: true,
     scheduling: FunctionResponseScheduling.INTERRUPT,
@@ -56,15 +35,15 @@ export const openClawTools: FunctionCall[] = [
     scheduling: FunctionResponseScheduling.SILENT,
   },
   {
-    name: 'manage_openclaw',
-    description: 'Controls the OpenClaw service and configuration (v2026.2.2-3).',
+    name: 'manage_orbit',
+    description: 'Controls the Orbit service and configuration (v2026.2.2-3).',
     parameters: {
       type: 'OBJECT',
       properties: {
-        action: { 
-          type: 'STRING', 
+        action: {
+          type: 'STRING',
           enum: ['start', 'stop', 'restart', 'status', 'doctor', 'fix', 'configure'],
-          description: 'The OpenClaw action to perform.' 
+          description: 'The OpenClaw action to perform.'
         },
         params: {
           type: 'STRING',
@@ -82,10 +61,10 @@ export const openClawTools: FunctionCall[] = [
     parameters: {
       type: 'OBJECT',
       properties: {
-        command: { 
-          type: 'STRING', 
+        command: {
+          type: 'STRING',
           enum: ['start', 'stop', 'status', 'list_configs'],
-          description: 'The OpenVPN command.' 
+          description: 'The OpenVPN command.'
         },
         config_name: {
           type: 'STRING',
@@ -99,14 +78,14 @@ export const openClawTools: FunctionCall[] = [
   },
   {
     name: 'repository_control',
-    description: 'Manages the OpenClaw GitHub repository (https://github.com/openclaw/openclaw.git) on the host.',
+    description: 'Manages the Orbit GitHub repository (https://github.com/openclaw/openclaw.git) on the host.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        command: { 
-          type: 'STRING', 
+        command: {
+          type: 'STRING',
           enum: ['pull', 'clone', 'log', 'branch', 'status', 'checkout'],
-          description: 'Git command to run within the project directory.' 
+          description: 'Git command to run within the project directory.'
         },
         branch: {
           type: 'STRING',
@@ -134,5 +113,52 @@ export const openClawTools: FunctionCall[] = [
     },
     isEnabled: true,
     scheduling: FunctionResponseScheduling.INTERRUPT
+  },
+  {
+    name: 'move_arm',
+    description: 'Moves the robotic arm (if connected via I/O) to specific coordinates.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        x: { type: 'NUMBER' },
+        y: { type: 'NUMBER' },
+        z: { type: 'NUMBER' },
+      },
+      required: ['x', 'y', 'z'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
+    name: 'operate_claw',
+    description: 'Opens or closes the physical robotic claw gripper.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        action: {
+          type: 'STRING',
+          enum: ['open', 'close']
+        },
+      },
+      required: ['action'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.INTERRUPT,
+  },
+  {
+    name: 'report_to_boss',
+    description: 'Sends a silent status update message to the Boss (User) during background tasks or multi-step operations. Use this to report progress without interrupting the flow.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        message: {
+          type: 'STRING',
+          description: 'The progress or status update message.'
+        },
+      },
+      required: ['message'],
+    },
+    isEnabled: true,
+    scheduling: FunctionResponseScheduling.SILENT,
   },
 ];

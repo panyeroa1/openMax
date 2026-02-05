@@ -19,7 +19,7 @@ function ControlTray({ children }: ControlTrayProps) {
   const connectButtonRef = useRef<HTMLButtonElement>(null);
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
-  const { toggleSidebar } = useUI();
+  const { isDashboardOpen, toggleDashboard, toggleSidebar } = useUI();
 
   useEffect(() => {
     if (!connected && connectButtonRef.current) {
@@ -84,7 +84,7 @@ function ControlTray({ children }: ControlTrayProps) {
     const a = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     a.href = url;
-    a.download = `openclaw-session-${timestamp}.json`;
+    a.download = `orbit-session-${timestamp}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -114,8 +114,16 @@ function ControlTray({ children }: ControlTrayProps) {
               <span className="material-symbols-outlined filled">mic_off</span>
             )}
           </button>
-          
+
           <div className="divider"></div>
+
+          <button
+            className={cn('action-button', { active: isDashboardOpen })}
+            onClick={toggleDashboard}
+            title="Toggle Dashboard"
+          >
+            <span className="material-symbols-outlined">analytics</span>
+          </button>
 
           <button
             className="action-button"
@@ -143,10 +151,10 @@ function ControlTray({ children }: ControlTrayProps) {
         </div>
 
         <div className="tray-center">
-           {connected && <div className="live-status-indicator">
-              <span className="pulse-dot"></span>
-              <span className="status-text">UPLINK ACTIVE</span>
-           </div>}
+          {connected && <div className="live-status-indicator">
+            <span className="pulse-dot"></span>
+            <span className="status-text">UPLINK ACTIVE</span>
+          </div>}
         </div>
 
         <div className="tray-right">

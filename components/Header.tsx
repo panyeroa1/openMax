@@ -15,14 +15,13 @@ export default function Header() {
           <div className="logo-area">
             <span className="material-symbols-outlined logo-icon">terminal</span>
             <div className="logo-text">
-              <h1>OPENMAX<span>BY EBURON AI</span></h1>
-              <p>Multi-Modal VPS Agent System</p>
+              <h1>OPENMAX <span>EBURON AI</span></h1>
             </div>
           </div>
         </div>
-        
+
         <div className="header-center">
-          {template === 'open-claw' && (
+          {template === 'orbit-agent' && (
             <div className="vps-badge">
               <span className="status-dot"></span>
               <span className="vps-label">SSH TUNNEL:</span>

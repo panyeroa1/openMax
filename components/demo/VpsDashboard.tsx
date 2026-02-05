@@ -14,8 +14,8 @@ const ResourceBar = ({ label, value, color }: { label: string; value: number; co
       <span className="resource-value">{value}%</span>
     </div>
     <div className="resource-track">
-      <div 
-        className="resource-fill" 
+      <div
+        className="resource-fill"
         style={{ width: `${value}%`, backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
       />
     </div>
@@ -28,7 +28,7 @@ export default function VpsDashboard() {
   const { connected, client } = useLiveAPIContext();
 
   useEffect(() => {
-    if (!connected || template !== 'open-claw') return;
+    if (!connected || template !== 'orbit-agent') return;
 
     // Initial fetch
     client.send([{ text: "Update system stats" }], false);
@@ -42,7 +42,7 @@ export default function VpsDashboard() {
     return () => clearInterval(interval);
   }, [connected, template, client]);
 
-  if (template !== 'open-claw' || !stats) return null;
+  if (template !== 'orbit-agent' || !stats) return null;
 
   return (
     <div className="vps-dashboard-widget">
@@ -50,11 +50,11 @@ export default function VpsDashboard() {
         <span className="dashboard-title">SYSTEM MONITOR</span>
         <span className="dashboard-host">168.231.78.113</span>
       </div>
-      
+
       <div className="dashboard-body">
         <ResourceBar label="CPU" value={stats.cpu} color="var(--Green-500)" />
         <ResourceBar label="MEM" value={stats.memory} color="var(--Blue-500)" />
-        
+
         <div className="stats-grid">
           <div className="stat-box">
             <span className="stat-label">DISK USE</span>
@@ -66,7 +66,7 @@ export default function VpsDashboard() {
           </div>
         </div>
       </div>
-      
+
       <div className="dashboard-footer">
         <div className="pulse-indicator"></div>
         <span>LIVE UPDATES ENABLED</span>
