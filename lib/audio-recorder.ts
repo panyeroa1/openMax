@@ -53,7 +53,7 @@ export class AudioRecorder {
 
   private starting: Promise<void> | null = null;
 
-  constructor(public sampleRate = 16000) {}
+  constructor(public sampleRate = 16000) { }
 
   async start() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -61,46 +61,51 @@ export class AudioRecorder {
     }
 
     this.starting = new Promise(async (resolve, reject) => {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.audioContext = await audioContext({ sampleRate: this.sampleRate });
-      this.source = this.audioContext.createMediaStreamSource(this.stream);
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.audioContext = await audioContext({ sampleRate: this.sampleRate });
+        this.source = this.audioContext.createMediaStreamSource(this.stream);
 
-      const workletName = 'audio-recorder-worklet';
-      const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
+        const workletName = 'audio-recorder-worklet';
+        const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
 
-      await this.audioContext.audioWorklet.addModule(src);
-      this.recordingWorklet = new AudioWorkletNode(
-        this.audioContext,
-        workletName
-      );
+        await this.audioContext.audioWorklet.addModule(src);
+        this.recordingWorklet = new AudioWorkletNode(
+          this.audioContext,
+          workletName
+        );
 
-      this.recordingWorklet.port.onmessage = async (ev: MessageEvent) => {
-        // Worklet processes recording floats and messages converted buffer
-        const arrayBuffer = ev.data.data.int16arrayBuffer;
+        this.recordingWorklet.port.onmessage = async (ev: MessageEvent) => {
+          // Worklet processes recording floats and messages converted buffer
+          const arrayBuffer = ev.data.data.int16arrayBuffer;
 
-        if (arrayBuffer) {
-          const arrayBufferString = arrayBufferToBase64(arrayBuffer);
+          if (arrayBuffer) {
+            const arrayBufferString = arrayBufferToBase64(arrayBuffer);
+            // FIX: Changed this.emit to this.emitter.emit
+            this.emitter.emit('data', arrayBufferString);
+          }
+        };
+        this.source.connect(this.recordingWorklet);
+
+        // vu meter worklet
+        const vuWorkletName = 'vu-meter';
+        await this.audioContext.audioWorklet.addModule(
+          createWorketFromSrc(vuWorkletName, VolMeterWorket)
+        );
+        this.vuWorklet = new AudioWorkletNode(this.audioContext, vuWorkletName);
+        this.vuWorklet.port.onmessage = (ev: MessageEvent) => {
           // FIX: Changed this.emit to this.emitter.emit
-          this.emitter.emit('data', arrayBufferString);
-        }
-      };
-      this.source.connect(this.recordingWorklet);
+          this.emitter.emit('volume', ev.data.volume);
+        };
 
-      // vu meter worklet
-      const vuWorkletName = 'vu-meter';
-      await this.audioContext.audioWorklet.addModule(
-        createWorketFromSrc(vuWorkletName, VolMeterWorket)
-      );
-      this.vuWorklet = new AudioWorkletNode(this.audioContext, vuWorkletName);
-      this.vuWorklet.port.onmessage = (ev: MessageEvent) => {
-        // FIX: Changed this.emit to this.emitter.emit
-        this.emitter.emit('volume', ev.data.volume);
-      };
-
-      this.source.connect(this.vuWorklet);
-      this.recording = true;
-      resolve();
-      this.starting = null;
+        this.source.connect(this.vuWorklet);
+        this.recording = true;
+        resolve();
+      } catch (error) {
+        reject(error);
+      } finally {
+        this.starting = null;
+      }
     });
   }
 

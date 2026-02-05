@@ -44,7 +44,7 @@ function ControlTray({ children }: ControlTrayProps) {
     };
     if (connected && !muted && audioRecorder) {
       audioRecorder.on('data', onData);
-      audioRecorder.start();
+      audioRecorder.start().catch((e: any) => console.error('AudioRecorder error:', e));
     } else {
       audioRecorder.stop();
     }
