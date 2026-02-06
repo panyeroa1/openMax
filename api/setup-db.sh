@@ -1,10 +1,14 @@
 #!/bin/bash
 # OpenMax - PostgreSQL Setup Script for VPS
-# Run this script on VPS: 168.231.78.113
+# Run this script on your VPS as root.
 
 set -e
 
 echo "=== OpenMax PostgreSQL Setup ==="
+
+# Resolve this script's directory so schema.sql can be found reliably.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCHEMA_SQL="${SCRIPT_DIR}/schema.sql"
 
 # Update package list
 echo "[1/6] Updating package list..."
@@ -21,33 +25,19 @@ sudo systemctl enable postgresql
 
 # Create database and user
 echo "[4/6] Creating database and user..."
-sudo -u postgres psql <<EOF
-CREATE DATABASE openmax_memory;
-EOF
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='openmax_memory'" | grep -q 1; then
+  sudo -u postgres createdb openmax_memory
+fi
 
 # Run schema
 echo "[5/6] Creating schema..."
-sudo -u postgres psql -d openmax_memory -f /root/openmax/server/schema.sql
-
-# Configure PostgreSQL to allow remote connections (optional, for external access)
-echo "[6/6] Configuring PostgreSQL..."
-PG_CONF="/etc/postgresql/12/main/postgresql.conf"
-PG_HBA="/etc/postgresql/12/main/pg_hba.conf"
-
-# Backup original files
-sudo cp $PG_CONF ${PG_CONF}.backup
-sudo cp $PG_HBA ${PG_HBA}.backup
-
-# Allow connections from localhost
-echo "host    openmax_memory    openmax_user    127.0.0.1/32    md5" | sudo tee -a $PG_HBA
-
-# Restart PostgreSQL
-sudo systemctl restart postgresql
+if [ ! -f "$SCHEMA_SQL" ]; then
+  echo "Schema not found at: $SCHEMA_SQL"
+  exit 1
+fi
+# /root is not readable by the postgres user; feed the schema via stdin instead.
+sudo -u postgres psql -d openmax_memory < "$SCHEMA_SQL"
 
 echo "✓ PostgreSQL setup complete!"
 echo "Database: openmax_memory"
-echo "User: openmax_user"
-echo "Password: OmX_Secure_2026!"
-echo ""
-echo "Test connection with:"
-echo "psql -U openmax_user -d openmax_memory -h 127.0.0.1"
+echo "User: openmax_user (created by schema.sql if not already present)"

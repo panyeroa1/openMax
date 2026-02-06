@@ -6,7 +6,13 @@
 -- \c openmax_memory;
 
 -- Create user for application
-CREATE USER openmax_user WITH PASSWORD 'OmX_Secure_2026!';
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'openmax_user') THEN
+    CREATE ROLE openmax_user LOGIN PASSWORD 'OmX_Secure_2026!';
+  END IF;
+END
+$$;
 
 -- Conversations table
 CREATE TABLE IF NOT EXISTS conversations (

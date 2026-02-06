@@ -5,206 +5,263 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { useAuth } from '../lib/state';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+const USER_ID_STORAGE_KEY = 'openmax_user_id';
+
+const buildApiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
+const getOrCreateUserId = () => {
+  if (typeof window === 'undefined') {
+    return `openmax-${uuidv4()}`;
+  }
+
+  const existing = window.localStorage.getItem(USER_ID_STORAGE_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const created = `openmax-${uuidv4()}`;
+  window.localStorage.setItem(USER_ID_STORAGE_KEY, created);
+  return created;
+};
 
 export interface Message {
-    id: number;
-    conversation_id: number;
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    timestamp: string;
-    metadata?: any;
+  id: number;
+  conversation_id: number;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Conversation {
-    id: number;
-    user_id: string;
-    session_id: string;
-    title?: string;
-    created_at: string;
-    updated_at: string;
+  id: number;
+  user_id: string;
+  session_id: string;
+  title?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SearchResult extends Message {
+  session_id: string;
+  title?: string;
 }
 
 export const useConversationMemory = () => {
-    const { currentUser } = useAuth();
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-    const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [currentUser] = useState(getOrCreateUserId);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    // Start new conversation
-    const startConversation = useCallback(async (title?: string) => {
-        if (!currentUser) return null;
+  const startConversation = useCallback(
+    async (title?: string) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-        try {
-            setIsLoading(true);
-            setError(null);
+        const response = await fetch(buildApiUrl('/api/conversations'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUser, title }),
+        });
 
-            const response = await fetch(`${API_BASE_URL}/api/conversations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: currentUser, title }),
-            });
-
-            if (!response.ok) throw new Error('Failed to create conversation');
-
-            const conversation: Conversation = await response.json();
-            setCurrentSessionId(conversation.session_id);
-            setConversationHistory([]);
-
-            return conversation.session_id;
-        } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-            setError(errorMsg);
-            console.error('Error starting conversation:', err);
-            return null;
-        } finally {
-            setIsLoading(false);
+        if (!response.ok) {
+          throw new Error('Failed to create conversation');
         }
-    }, [currentUser]);
 
-    // Save message to database
-    const saveMessage = useCallback(async (
-        role: 'user' | 'assistant' | 'system',
-        content: string,
-        metadata?: any
+        const conversation: Conversation = await response.json();
+        setCurrentSessionId(conversation.session_id);
+        setConversationHistory([]);
+
+        setConversations(prev => {
+          const filtered = prev.filter(item => item.session_id !== conversation.session_id);
+          return [conversation, ...filtered];
+        });
+
+        return conversation.session_id;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMsg);
+        console.error('Error starting conversation:', err);
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser]
+  );
+
+  const saveMessage = useCallback(
+    async (
+      role: 'user' | 'assistant' | 'system',
+      content: string,
+      metadata?: Record<string, unknown>,
+      sessionIdOverride?: string
     ) => {
-        if (!currentSessionId) {
-            console.warn('No active session. Creating new conversation...');
-            const sessionId = await startConversation();
-            if (!sessionId) return null;
+      let targetSessionId = sessionIdOverride ?? currentSessionId;
+
+      if (!targetSessionId) {
+        targetSessionId = await startConversation();
+      }
+
+      if (!targetSessionId) {
+        console.error('Unable to save message because conversation session was not created.');
+        return null;
+      }
+
+      try {
+        const response = await fetch(buildApiUrl('/api/messages'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: targetSessionId,
+            role,
+            content,
+            metadata,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save message');
         }
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: currentSessionId,
-                    role,
-                    content,
-                    metadata,
-                }),
-            });
+        const message: Message = await response.json();
 
-            if (!response.ok) throw new Error('Failed to save message');
+        setCurrentSessionId(targetSessionId);
+        setConversationHistory(prev => [...prev, message]);
 
-            const message: Message = await response.json();
-            setConversationHistory(prev => [...prev, message]);
+        return message;
+      } catch (err) {
+        console.error('Error saving message:', err);
+        return null;
+      }
+    },
+    [currentSessionId, startConversation]
+  );
 
-            return message;
-        } catch (err) {
-            console.error('Error saving message:', err);
-            return null;
+  const loadConversation = useCallback(async (sessionId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(buildApiUrl(`/api/messages/${sessionId}`));
+
+      if (!response.ok) {
+        throw new Error('Failed to load conversation');
+      }
+
+      const messages: Message[] = await response.json();
+      setCurrentSessionId(sessionId);
+      setConversationHistory(messages);
+
+      return messages;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMsg);
+      console.error('Error loading conversation:', err);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loadConversations = useCallback(
+    async (limit = 50) => {
+      try {
+        setIsLoading(true);
+
+        const response = await fetch(
+          buildApiUrl(`/api/conversations/${currentUser}?limit=${limit}`)
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load conversations');
         }
-    }, [currentSessionId, startConversation]);
 
-    // Load conversation history
-    const loadConversation = useCallback(async (sessionId: string) => {
-        try {
-            setIsLoading(true);
-            setError(null);
+        const data: Conversation[] = await response.json();
+        setConversations(data);
 
-            const response = await fetch(`${API_BASE_URL}/api/messages/${sessionId}`);
+        return data;
+      } catch (err) {
+        console.error('Error loading conversations:', err);
+        return [];
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser]
+  );
 
-            if (!response.ok) throw new Error('Failed to load conversation');
+  const searchMessages = useCallback(
+    async (query: string, limit = 50) => {
+      if (!query.trim()) {
+        return [] as SearchResult[];
+      }
 
-            const messages: Message[] = await response.json();
-            setCurrentSessionId(sessionId);
-            setConversationHistory(messages);
+      try {
+        const response = await fetch(
+          buildApiUrl(
+            `/api/search?userId=${encodeURIComponent(currentUser)}&query=${encodeURIComponent(query)}&limit=${limit}`
+          )
+        );
 
-            return messages;
-        } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-            setError(errorMsg);
-            console.error('Error loading conversation:', err);
-            return [];
-        } finally {
-            setIsLoading(false);
+        if (!response.ok) {
+          throw new Error('Failed to search messages');
         }
-    }, []);
 
-    // Load user's conversations list
-    const loadConversations = useCallback(async (limit = 50) => {
-        if (!currentUser) return;
+        return (await response.json()) as SearchResult[];
+      } catch (err) {
+        console.error('Error searching messages:', err);
+        return [] as SearchResult[];
+      }
+    },
+    [currentUser]
+  );
 
-        try {
-            setIsLoading(true);
-            const response = await fetch(
-                `${API_BASE_URL}/api/conversations/${currentUser}?limit=${limit}`
-            );
+  const updateTitle = useCallback(
+    async (sessionId: string, title: string) => {
+      try {
+        const response = await fetch(buildApiUrl(`/api/conversation/${sessionId}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
 
-            if (!response.ok) throw new Error('Failed to load conversations');
-
-            const data: Conversation[] = await response.json();
-            setConversations(data);
-
-            return data;
-        } catch (err) {
-            console.error('Error loading conversations:', err);
-            return [];
-        } finally {
-            setIsLoading(false);
+        if (!response.ok) {
+          throw new Error('Failed to update title');
         }
-    }, [currentUser]);
 
-    // Search across all messages
-    const searchMessages = useCallback(async (query: string, limit = 50) => {
-        if (!currentUser || !query) return [];
+        const updated: Conversation = await response.json();
+        setConversations(prev =>
+          prev.map(item => (item.session_id === updated.session_id ? updated : item))
+        );
+      } catch (err) {
+        console.error('Error updating title:', err);
+      }
+    },
+    []
+  );
 
-        try {
-            const response = await fetch(
-                `${API_BASE_URL}/api/search?userId=${currentUser}&query=${encodeURIComponent(query)}&limit=${limit}`
-            );
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
 
-            if (!response.ok) throw new Error('Failed to search messages');
-
-            return await response.json();
-        } catch (err) {
-            console.error('Error searching messages:', err);
-            return [];
-        }
-    }, [currentUser]);
-
-    // Update conversation title
-    const updateTitle = useCallback(async (sessionId: string, title: string) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/conversation/${sessionId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title }),
-            });
-
-            if (!response.ok) throw new Error('Failed to update title');
-
-            // Refresh conversations list
-            await loadConversations();
-        } catch (err) {
-            console.error('Error updating title:', err);
-        }
-    }, [loadConversations]);
-
-    // Load user's conversations on mount
-    useEffect(() => {
-        if (currentUser) {
-            loadConversations();
-        }
-    }, [currentUser, loadConversations]);
-
-    return {
-        currentSessionId,
-        conversationHistory,
-        conversations,
-        isLoading,
-        error,
-        startConversation,
-        saveMessage,
-        loadConversation,
-        loadConversations,
-        searchMessages,
-        updateTitle,
-    };
+  return {
+    currentUser,
+    currentSessionId,
+    conversationHistory,
+    conversations,
+    isLoading,
+    error,
+    startConversation,
+    saveMessage,
+    loadConversation,
+    loadConversations,
+    searchMessages,
+    updateTitle,
+  };
 };
